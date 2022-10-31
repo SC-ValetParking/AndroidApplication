@@ -1,8 +1,11 @@
 package com.competition.valetparking
 
+import android.content.res.ColorStateList
+import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.ViewGroup
+import android.widget.ProgressBar
 import android.widget.TableLayout
 import android.widget.TableRow
 import androidx.fragment.app.FragmentManager
@@ -27,6 +30,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         NaverMapSdk.getInstance(this).client =
             NaverMapSdk.NaverCloudPlatformClient(BuildConfig.NAVERMAP_CLIENT_ID)
+
+        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)
+        saturationBar.progressTintList = ColorStateList.valueOf(Color.parseColor("#FF9233"))
     }
 
     override fun onMapReady(naverMap: NaverMap) {
