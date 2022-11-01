@@ -33,9 +33,18 @@
             android:id="@+id/saturation_bar"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="16dp"
+            android:layout_height="20dp"
             android:progress="37"
             android:progressDrawable="@drawable/saturation_bar" />
     </LinearLayout>
+
+    <TableLayout
+        android:id="@+id/parking_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="10dp"
+        android:stretchColumns="*"
+        app:layout_constraintTop_toBottomOf="@id/saturation_layout"
+        tools:ignore="UselessLeaf" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
