@@ -39,12 +39,21 @@
     </LinearLayout>
 
     <TableLayout
-        android:id="@+id/parking_layout"
+        android:id="@+id/general_parking_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="10dp"
         android:stretchColumns="*"
         app:layout_constraintTop_toBottomOf="@id/saturation_layout"
+        tools:ignore="UselessLeaf" />
+
+    <TableLayout
+        android:id="@+id/special_parking_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="10dp"
+        android:stretchColumns="*"
+        app:layout_constraintTop_toBottomOf="@id/general_parking_layout"
         tools:ignore="UselessLeaf" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
