@@ -10,4 +10,9 @@
 
     <color name="using">#FFCDD2</color>
     <color name="free">#B2DFDB</color>
+
+    <color name="green">#AED581</color>
+    <color name="yellow">#FFD54F</color>
+    <color name="orange">#FF8A65</color>
+    <color name="red">#EF5350</color>
 </resources>
