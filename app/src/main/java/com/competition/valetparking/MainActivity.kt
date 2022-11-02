@@ -5,7 +5,6 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.util.Log
 import android.view.Gravity
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -62,7 +61,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val progress: Int =
             (parkingMap.filterValues { it == null }.size * 100) / parkingSize   //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
         saturationBar.progress = progress
-        Log.d(localClassName, "progress: $progress")
         val color: Int = when (progress) {      //포화도 색상 선택
             in 1..25 -> R.color.green
             in 26..50 -> R.color.yellow
@@ -74,12 +72,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val generalArea: TableLayout = findViewById(R.id.general_parking_layout)    //일반주차구역
         val specialArea: TableLayout = findViewById(R.id.special_parking_layout)    //특수주차구역
-        val specialList = ArrayList<Int>()  //특수주차구역 목록 생성
         var generalChild = TableRow(this)   //일반주차구역의 Row 생성
+        val specialList = ArrayList<Int>()  //특수주차 칸 목록 생성
 
-        var seek = 0    //특수주차구역 때문에 비어버린 칸을 당겨오기 위한 변수
+        var seek = 0    //특수주차 칸 때문에 비어버린 칸을 당겨오기 위한 변수
         for (i in 1..parkingSize) {
-            if (parkingMap[i] == null) {    //일반주차구역인 경우 (일반주차구역이 아닌 경우)
+            if (parkingMap[i] == null) {    //일반주차 칸인 경우 (특수주차 칸이 아닌 경우)
                 val textView = newLocText()     //하단의 TableRow에 할당하게 되면, TextView를 새로 만들어야 함
                 textView.text = String.format("%02d", i)
                 textView.background = ColorDrawable(    //TextView 배경 색상 지정
@@ -94,7 +92,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 )
                 generalChild.addView(textView)
                 seek++  //i와 별개로 seek 변수를 증가함으로서 특수주차구역을 제외한 칸 수만 카운트함
-            } else specialList.add(i)   //특수주차구역인 경우 특수주차구역 목록에 칸 번호 추가
+            } else specialList.add(i)   //특수주차 칸인 경우 특수주차 칸 목록에 해당 칸 번호 추가
             if (seek % tableRowLength == 0 || i == parkingSize) {    //일반주차구역 테이블에 행 길이 tableRowLength 만큼 넣음.
                 generalArea.addView(generalChild)       //만약 현재 루프가 마지막 칸일 경우 최대 행 길이가 채워지지 않았더도 넣음.
                 generalChild = TableRow(this)
