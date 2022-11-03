@@ -92,10 +92,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             val imageView = ImageView(this)
             val textView = newLocText()
             val image = when (parkingMap[value]!!.specialType) {    //구분 이미지 선택
-                SpecialType.LIGHT -> R.drawable.ic_baseline_car
+                SpecialType.LIGHT -> R.drawable.ic_baseline_light_car
+                SpecialType.ELECTRIC -> R.drawable.ic_baseline_electric_car
                 else -> R.drawable.ic_baseline_disabled
             }
             imageView.setImageResource(image)
+            imageView.imageTintList = ColorStateList.valueOf(Color.parseColor("#3A3B3C"))
             textView.text = String.format("%02d", value)
             linearLayout.orientation = LinearLayout.HORIZONTAL
             linearLayout.gravity = Gravity.CENTER
