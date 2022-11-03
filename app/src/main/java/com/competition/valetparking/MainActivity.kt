@@ -57,19 +57,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         parkingMap[19] = null
         parkingMap[20] = ParkingData(SpecialType.LIGHT, true)
 
-        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)  //포화도
-        val progress: Int =
-            (parkingMap.filterValues { it == null }.size * 100) / parkingSize   //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
-        saturationBar.progress = progress
-        val color: Int = when (progress) {      //포화도 색상 선택
-            in 1..25 -> R.color.green
-            in 26..50 -> R.color.yellow
-            in 51..75 -> R.color.orange
-            else -> R.color.red
-        }
-        saturationBar.progressTintList =
-            ColorStateList.valueOf(ContextCompat.getColor(this, color))    //포화도 색상 변경
-
         val generalArea: TableLayout = findViewById(R.id.general_parking_layout)    //일반주차구역
         val specialArea: TableLayout = findViewById(R.id.special_parking_layout)    //특수주차구역
         var generalChild = TableRow(this)   //일반주차구역의 Row 생성
@@ -98,6 +85,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 generalChild = TableRow(this)
             }
         }
+
+        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)  //포화도
+        val saturation: Int =
+            (parkingMap.filterValues { it == null }.size * 100) / (parkingSize - specialList.size)
+        //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
+        saturationBar.progress = saturation
+        val color: Int = when (saturation) {      //포화도 색상 선택
+            in 1..25 -> R.color.green
+            in 26..50 -> R.color.yellow
+            in 51..75 -> R.color.orange
+            else -> R.color.red
+        }
+        saturationBar.progressTintList =
+            ColorStateList.valueOf(ContextCompat.getColor(this, color))    //포화도 색상 변경
 
         var specialChild = TableRow(this)   //특수주차구역의 Row 생성
         for (i in 0 until specialList.size) {
