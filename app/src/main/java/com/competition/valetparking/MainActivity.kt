@@ -3,7 +3,6 @@ package com.competition.valetparking
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.*
@@ -14,18 +13,18 @@ import com.naver.maps.map.*
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    enum class SpecialType {    //특별주차구역 구분
-        LIGHT, DISABLED     //경차, 장애인
+    enum class SpecialType {    //특수주차구역 구분
+        LIGHT, ELECTRIC, DISABLED     //경차, 전기차, 장애인
     }
 
     data class ParkingData(     //parkingMap의 value으로 사용하기 위해 데이터클래스 생성
-        var specialType: SpecialType, var using: Boolean    //특별주차구역 구분, 주차 여부
+        var specialType: SpecialType, var using: Boolean    //특수주차구역 구분, 주차 여부
     )
 
     private lateinit var mNaverMap: NaverMap
 
     //아래 변수들은 테스트를 위한 임시 변수로, 실제 값이 들어오면 동적으로 구현할 예정.
-    private val parkingSize = 20    //주차 칸 수 (특별주차구역 포함)
+    private val parkingSize = 20    //주차 칸 수 (특수주차구역 포함)
     private val tableRowLength = 4  //최대 행 길이
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,8 +39,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         NaverMapSdk.getInstance(this).client =
             NaverMapSdk.NaverCloudPlatformClient(BuildConfig.NAVERMAP_CLIENT_ID)
 
-        val parkingMap = HashMap<Int, ParkingData?>() //현재 주차중인 칸 or 특별주차구역 칸
-        parkingMap[1] = null                        //null: 일반주차구역 사용중, ParkingData: 특별주차구역 구분과 주차여부
+        val parkingMap = HashMap<Int, ParkingData?>() //현재 주차중인 칸 or 특수주차구역 칸
+        parkingMap[1] = null                        //null: 일반주차구역 사용중, ParkingData: 특수주차구역 구분과 주차여부
         parkingMap[3] = null
         parkingMap[4] = null
         parkingMap[5] = ParkingData(SpecialType.DISABLED, false)
@@ -59,15 +58,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val generalArea: TableLayout = findViewById(R.id.general_parking_layout)    //일반주차구역
         val specialArea: TableLayout = findViewById(R.id.special_parking_layout)    //특수주차구역
-        var generalChild = TableRow(this)   //일반주차구역의 Row 생성
         val specialList = ArrayList<Int>()  //특수주차 칸 목록 생성
 
+        var generalChild = TableRow(this)   //일반주차구역의 Row 생성
         var seek = 0    //특수주차 칸 때문에 비어버린 칸을 당겨오기 위한 변수
         for (i in 1..parkingSize) {
             if (parkingMap[i] == null) {    //일반주차 칸인 경우 (특수주차 칸이 아닌 경우)
                 val textView = newLocText()     //하단의 TableRow에 할당하게 되면, TextView를 새로 만들어야 함
                 textView.text = String.format("%02d", i)
-                textView.background = ColorDrawable(    //TextView 배경 색상 지정
+                textView.setBackgroundColor(    //TextView 배경 색상 지정
                     ContextCompat.getColor(
                         this,
                         if (parkingMap.containsKey(i)) {  //parkingMap에 i라는 키 값이 있다면 (위에서 특수주차구역에 대한 검사를 했기 때문에 일반주차구역으로 간주)
@@ -86,20 +85,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
-        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)  //포화도
-        val saturation: Int =
-            (parkingMap.filterValues { it == null }.size * 100) / (parkingSize - specialList.size)
-        //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
-        saturationBar.progress = saturation
-        val color: Int = when (saturation) {      //포화도 색상 선택
-            in 1..25 -> R.color.green
-            in 26..50 -> R.color.yellow
-            in 51..75 -> R.color.orange
-            else -> R.color.red
-        }
-        saturationBar.progressTintList =
-            ColorStateList.valueOf(ContextCompat.getColor(this, color))    //포화도 색상 변경
-
         var specialChild = TableRow(this)   //특수주차구역의 Row 생성
         for (i in 0 until specialList.size) {
             val value = specialList[i]
@@ -114,7 +99,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             textView.text = String.format("%02d", value)
             linearLayout.orientation = LinearLayout.HORIZONTAL
             linearLayout.gravity = Gravity.CENTER
-            linearLayout.background = ColorDrawable(
+            linearLayout.setBackgroundColor(
                 ContextCompat.getColor(
                     this, if (parkingMap[value]!!.using) {
                         R.color.using
@@ -131,6 +116,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 specialChild = TableRow(this)
             }
         }
+
+        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)  //포화도
+        val saturation: Int =
+            (parkingMap.filterValues { it == null }.size * 100) / (parkingSize - specialList.size)
+        //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
+        val color: Int = when (saturation) {      //포화도 색상 선택
+            in 1..25 -> R.color.green
+            in 26..50 -> R.color.yellow
+            in 51..75 -> R.color.orange
+            else -> R.color.red
+        }
+        saturationBar.progressTintList =
+            ColorStateList.valueOf(ContextCompat.getColor(this, color))    //포화도 색상 변경
+        saturationBar.progress = saturation
     }
 
     override fun onMapReady(naverMap: NaverMap) {
