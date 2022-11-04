@@ -69,11 +69,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 textView.setBackgroundColor(    //TextView 배경 색상 지정
                     ContextCompat.getColor(
                         this,
-                        if (parkingMap.containsKey(i)) {  //parkingMap에 i라는 키 값이 있다면 (위에서 특수주차구역에 대한 검사를 했기 때문에 일반주차구역으로 간주)
-                            R.color.using
-                        } else {
-                            R.color.free
-                        }
+                        if (parkingMap.containsKey(i)) R.color.using    //parkingMap에 i라는 키 값이 있다면 (위에서 특수주차구역에 대한 검사를 했기 때문에 일반주차구역으로 간주)
+                        else R.color.free
                     )
                 )
                 generalChild.addView(textView)
@@ -97,17 +94,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 else -> R.drawable.ic_baseline_disabled
             }
             imageView.setImageResource(image)
-            imageView.imageTintList = ColorStateList.valueOf(Color.parseColor("#3A3B3C"))
+            imageView.imageTintList =
+                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.special_icon))
             textView.text = String.format("%02d", value)
             linearLayout.orientation = LinearLayout.HORIZONTAL
             linearLayout.gravity = Gravity.CENTER
             linearLayout.setBackgroundColor(
                 ContextCompat.getColor(
-                    this, if (parkingMap[value]!!.using) {
-                        R.color.using
-                    } else {
-                        R.color.free
-                    }
+                    this, if (parkingMap[value]!!.using) R.color.using
+                    else R.color.free
                 )
             )
             linearLayout.addView(imageView)
