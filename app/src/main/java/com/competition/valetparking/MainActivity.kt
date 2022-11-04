@@ -1,5 +1,6 @@
 package com.competition.valetparking
 
+import android.app.ActionBar.LayoutParams
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -88,15 +89,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             val linearLayout = LinearLayout(this)
             val imageView = ImageView(this)
             val textView = newLocText()
+            textView.text = String.format("%02d", value)
             val image = when (parkingMap[value]!!.specialType) {    //구분 이미지 선택
                 SpecialType.LIGHT -> R.drawable.ic_baseline_light_car
                 SpecialType.ELECTRIC -> R.drawable.ic_baseline_electric_car
                 else -> R.drawable.ic_baseline_disabled
             }
             imageView.setImageResource(image)
-            imageView.imageTintList =
-                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.special_icon))
-            textView.text = String.format("%02d", value)
+            imageView.imageTintList = ColorStateList.valueOf(Color.DKGRAY)
+            imageView.layoutParams =
+                TableRow.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             linearLayout.orientation = LinearLayout.HORIZONTAL
             linearLayout.gravity = Gravity.CENTER
             linearLayout.setBackgroundColor(
@@ -137,7 +139,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun newLocText(): TextView {
         val locText = TextView(this)
-        locText.layoutParams = TableRow.LayoutParams(50, 110)
+        locText.layoutParams = TableRow.LayoutParams(100, 120)
         locText.textSize = 16F
         locText.typeface = Typeface.create(locText.typeface, Typeface.BOLD)
         locText.setTextColor(Color.DKGRAY)
