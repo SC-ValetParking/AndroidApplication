@@ -1,5 +1,5 @@
 # ValetParking App (Android)
-ValetParking Application made with Kotlin, Android Studio
+ValetParking Application made with Android Studio, Kotlin
 
 
 ### 1. Application Sample
