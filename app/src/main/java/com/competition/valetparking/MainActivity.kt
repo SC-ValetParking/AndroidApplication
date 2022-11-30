@@ -97,7 +97,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
                     LatLng(
                         lastGeoPoint.latitude, lastGeoPoint.longitude
                     )
-                )
+                ).animate(CameraAnimation.Fly)
             )
         }.addOnFailureListener { exception ->
             Log.w(TAG, "Error getting documents, $exception")
@@ -128,6 +128,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
     override fun onClick(p0: Overlay): Boolean {
         if (p0 is Marker) {
+            mNaverMap.moveCamera(CameraUpdate.scrollTo(p0.position).animate(CameraAnimation.Easing))
+
             val reference = coordinateMap[p0.position] ?: return false
             referenceListener?.remove()
 
