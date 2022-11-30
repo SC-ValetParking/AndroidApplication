@@ -143,13 +143,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
                 floorList.clear()
                 val data = snapshot?.data
-                val p1 = data?.get("floorMap") as MutableList<*>
+                val p1 = data?.get("floorArray") as MutableList<*>
                 for (floor in p1) {
-                    val p2 = floor as HashMap<*, *>
-                    val p3 = p2["parkingMap"] as Map<*, *>
-                    val parkingSize = anyToInt(p2["parkingSize"])
+                    floor as HashMap<*, *>
+                    val parkingSize = anyToInt(floor["parkingSize"])
                     val parkingMap = HashMap<Int, ParkingData?>()
-                    for ((key, value) in p3) {
+                    for ((key, value) in floor["parkingMap"] as Map<*, *>) {
                         val values = value as List<*>?
                         parkingMap[anyToInt(key)] = if (values != null) ParkingData(
                             SpecialType.fromInt(anyToInt(values[0])), anyToBoolean(values[1])
