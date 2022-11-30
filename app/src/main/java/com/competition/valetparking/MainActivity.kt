@@ -5,18 +5,37 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
+import android.view.View
 import android.widget.*
+import android.widget.AdapterView.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.*
+import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.Overlay
+import com.naver.maps.map.overlay.Overlay.OnClickListener
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback {
+class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
-    enum class SpecialType {    //특수주차구역 구분
-        LIGHT, ELECTRIC, DISABLED     //경차, 전기차, 장애인
+    enum class SpecialType(val value: Int) {    //특수주차구역 구분
+        DISABLED(0), LIGHT(1), ELECTRIC(2);     //장애인, 경차, 전기차
+
+        companion object {
+            fun fromInt(value: Int) = values().first { it.value == value }
+        }
     }
+
+    data class FloorData(
+        var parkingMap: HashMap<Int, ParkingData?>, var parkingSize: Int
+    )
 
     data class ParkingData(     //parkingMap의 value으로 사용하기 위해 데이터클래스 생성
         var specialType: SpecialType, var using: Boolean    //특수주차구역 구분, 주차 여부
@@ -24,9 +43,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mNaverMap: NaverMap
 
-    //아래 변수들은 테스트를 위한 임시 변수로, 실제 값이 들어오면 동적으로 구현할 예정.
-    private val parkingSize = 20    //주차 칸 수 (특수주차구역 포함)
-    private val tableRowLength = 4  //최대 행 길이
+    //Layout 변수
+    private lateinit var generalArea: TableLayout
+    private lateinit var specialArea: TableLayout
+    private lateinit var floorSpinner: Spinner
+
+    private val tableRowLength = 6  //최대 행 길이
+    private val coordinateMap = HashMap<LatLng, DocumentReference?>()
+    private val floorList: MutableList<FloorData> = arrayListOf()
+
+    //Floor focus 유지를 위한 변수들
+    private var prevMarker: Marker? = null
+    private var recentMarker: Marker? = null
+    private var prevFloor: Int? = null
+
+    //reference listener 중복 생성 방지를 위한 변수
+    private var referenceListener: ListenerRegistration? = null
+
+    private val TAG = "MainActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,29 +74,117 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         NaverMapSdk.getInstance(this).client =
             NaverMapSdk.NaverCloudPlatformClient(BuildConfig.NAVERMAP_CLIENT_ID)
 
-        val parkingMap = HashMap<Int, ParkingData?>() //현재 주차중인 칸 or 특수주차구역 칸
-        parkingMap[1] = null                        //null: 일반주차구역 사용중, ParkingData: 특수주차구역 구분과 주차여부
-        parkingMap[3] = null
-        parkingMap[4] = null
-        parkingMap[5] = ParkingData(SpecialType.DISABLED, false)
-        parkingMap[6] = null
-        parkingMap[7] = null
-        parkingMap[8] = ParkingData(SpecialType.DISABLED, false)
-        parkingMap[9] = null
-        parkingMap[11] = ParkingData(SpecialType.LIGHT, false)
-        parkingMap[12] = null
-        parkingMap[13] = null
-        parkingMap[14] = null
-        parkingMap[17] = null
-        parkingMap[19] = null
-        parkingMap[20] = ParkingData(SpecialType.LIGHT, true)
+        generalArea = findViewById(R.id.general_parking_layout)    //일반주차구역
+        specialArea = findViewById(R.id.special_parking_layout)    //특수주차구역
+        floorSpinner = findViewById(R.id.floor_spinner)
 
-        val generalArea: TableLayout = findViewById(R.id.general_parking_layout)    //일반주차구역
-        val specialArea: TableLayout = findViewById(R.id.special_parking_layout)    //특수주차구역
+        val db = Firebase.firestore
+        db.collection("Coordinates").get().addOnSuccessListener { coordinateData ->
+            for (s1 in coordinateData) {
+                val geoPoint = s1.getGeoPoint("geoPoint")
+                if (geoPoint != null) {
+                    val location = LatLng(geoPoint.latitude, geoPoint.longitude)
+                    val marker = Marker()
+                    marker.position = location
+                    marker.onClickListener = this
+                    marker.map = mNaverMap
+                    coordinateMap[location] = s1.getDocumentReference("reference")
+                }
+            }
+            val lastGeoPoint = coordinateData.last().getGeoPoint("geoPoint")
+            if (lastGeoPoint != null) mNaverMap.moveCamera(
+                CameraUpdate.scrollTo(
+                    LatLng(
+                        lastGeoPoint.latitude, lastGeoPoint.longitude
+                    )
+                )
+            )
+        }.addOnFailureListener { exception ->
+            Log.w(TAG, "Error getting documents, $exception")
+        }
+
+        floorSpinner.onItemSelectedListener = object : OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?, view: View?, selectFloor: Int, id: Long
+            ) {
+                if (prevMarker != recentMarker || prevFloor != selectFloor) {
+                    prevFloor = selectFloor
+                    drawParkingLayout(floorList[selectFloor])
+                } else {
+                    floorSpinner.setSelection(prevFloor!!)
+                    drawParkingLayout(floorList[prevFloor!!])
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    override fun onMapReady(naverMap: NaverMap) {
+        mNaverMap = naverMap
+        val uiSettings: UiSettings = mNaverMap.uiSettings
+        uiSettings.isZoomControlEnabled = false
+    }
+
+    override fun onClick(p0: Overlay): Boolean {
+        if (p0 is Marker) {
+            val reference = coordinateMap[p0.position] ?: return false
+            referenceListener?.remove()
+
+            referenceListener = reference.addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.w(TAG, "Listen failed.", e)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot == null || !snapshot.exists()) Log.d(TAG, "Current data: null")
+
+                floorList.clear()
+                val data = snapshot?.data
+                val p1 = data?.get("floorMap") as MutableList<*>
+                for (floor in p1) {
+                    val p2 = floor as HashMap<*, *>
+                    val p3 = p2["parkingMap"] as Map<*, *>
+                    val parkingSize = anyToInt(p2["parkingSize"])
+                    val parkingMap = HashMap<Int, ParkingData?>()
+                    for ((key, value) in p3) {
+                        val values = value as List<*>?
+                        parkingMap[anyToInt(key)] = if (values != null) ParkingData(
+                            SpecialType.fromInt(anyToInt(values[0])), anyToBoolean(values[1])
+                        ) else null
+                    }
+                    floorList.add(FloorData(parkingMap, parkingSize))
+                }
+                if (floorSpinner.visibility == INVISIBLE) floorSpinner.visibility = VISIBLE
+                prevMarker = recentMarker
+                recentMarker = p0
+
+                if (floorSpinner.adapter == null || floorSpinner.adapter.count != floorList.size) {
+                    val spinnerList = ArrayList<String>()
+                    for (i in 1..floorList.size) spinnerList.add("$i Floor")
+                    val spinnerAdapter: ArrayAdapter<String> = ArrayAdapter(
+                        this, android.R.layout.simple_spinner_dropdown_item, spinnerList
+                    )
+                    floorSpinner.adapter = spinnerAdapter
+                } else if (prevFloor != null) drawParkingLayout(floorList[prevFloor!!])
+            }
+            return true
+        }
+        return false
+    }
+
+    private fun drawParkingLayout(floorData: FloorData) {
+        generalArea.removeAllViews()
+        specialArea.removeAllViews()
+
         val specialList = ArrayList<Int>()  //특수주차 칸 목록 생성
 
         var generalChild = TableRow(this)   //일반주차구역의 Row 생성
         var seek = 0    //특수주차 칸 때문에 비어버린 칸을 당겨오기 위한 변수
+
+        val parkingSize = floorData.parkingSize
+        val parkingMap = floorData.parkingMap
+
         for (i in 1..parkingSize) {
             if (parkingMap[i] == null) {    //일반주차 칸인 경우 (특수주차 칸이 아닌 경우)
                 val textView = newLocText()     //하단의 TableRow에 할당하게 되면, TextView를 새로 만들어야 함
@@ -131,12 +253,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         saturationBar.progress = saturation
     }
 
-    override fun onMapReady(naverMap: NaverMap) {
-        mNaverMap = naverMap
-        val uiSettings: UiSettings = mNaverMap.uiSettings
-        uiSettings.isZoomControlEnabled = false
-    }
-
     private fun newLocText(): TextView {
         val locText = TextView(this)
         locText.layoutParams = TableRow.LayoutParams(100, 120)
@@ -145,5 +261,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         locText.setTextColor(Color.DKGRAY)
         locText.gravity = Gravity.CENTER
         return locText
+    }
+
+    companion object {
+        fun anyToInt(value: Any?) = value.toString().toInt()
+        fun anyToBoolean(value: Any?) = value.toString().toBoolean()
     }
 }
