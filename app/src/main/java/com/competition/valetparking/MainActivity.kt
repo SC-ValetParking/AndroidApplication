@@ -239,7 +239,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
             }
         }
 
-        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)  //포화도
+        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)  //포화도 막대
         val saturation: Int =
             (parkingMap.filterValues { it == null }.size * 100) / (parkingSize - specialList.size)
         //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
