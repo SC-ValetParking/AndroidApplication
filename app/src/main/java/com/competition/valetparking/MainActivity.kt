@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
     private lateinit var imageView: ImageView
     private lateinit var floorSpinner: Spinner
 
-    private val tableRowLength = 6  //최대 행 길이
+    private val tableRowLength = 4  //최대 행 길이
     private val coordinateMap = HashMap<LatLng, DocumentReference?>()
     private val floorList: MutableList<FloorData> = arrayListOf()
 
@@ -85,8 +85,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         val fm: FragmentManager = supportFragmentManager
         val mapFragment: MapFragment = fm.findFragmentById(R.id.map_fragment) as MapFragment
 
-        mapFragment.getMapAsync(this)
+        db = Firebase.firestore
+        storageRef = FirebaseStorage.getInstance().reference
 
+        mapFragment.getMapAsync(this)
         NaverMapSdk.getInstance(this).client =
             NaverMapSdk.NaverCloudPlatformClient(BuildConfig.NAVERMAP_CLIENT_ID)
 
@@ -95,33 +97,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         saturationBar = findViewById(R.id.saturation_bar)           //포화도 막대
         imageView = findViewById(R.id.image_view)                     //이미지뷰
         floorSpinner = findViewById(R.id.floor_spinner)             //층 수 스피너
-
-        db = Firebase.firestore
-        storageRef = FirebaseStorage.getInstance().reference
-
-        db.collection("Coordinates").get().addOnSuccessListener { coordinateData ->
-            for (s1 in coordinateData) {
-                val geoPoint = s1.getGeoPoint("geoPoint")
-                if (geoPoint != null) {
-                    val location = LatLng(geoPoint.latitude, geoPoint.longitude)
-                    val marker = Marker()
-                    marker.position = location
-                    marker.onClickListener = this
-                    marker.map = mNaverMap
-                    coordinateMap[location] = s1.getDocumentReference("reference")
-                }
-            }
-            val lastGeoPoint = coordinateData.last().getGeoPoint("geoPoint")
-            if (lastGeoPoint != null) mNaverMap.moveCamera(
-                CameraUpdate.scrollTo(
-                    LatLng(
-                        lastGeoPoint.latitude, lastGeoPoint.longitude
-                    )
-                ).animate(CameraAnimation.Fly)
-            )
-        }.addOnFailureListener { e ->
-            Log.w(TAG, "Error getting documents, $e")
-        }
 
         floorSpinner.onItemSelectedListener = object : OnItemSelectedListener {
             override fun onItemSelected(
@@ -150,6 +125,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         mNaverMap = naverMap
         val uiSettings: UiSettings = mNaverMap.uiSettings
         uiSettings.isZoomControlEnabled = false
+
+        db.collection("Coordinates").get().addOnSuccessListener { coordinateData ->
+            for (s1 in coordinateData) {
+                val geoPoint = s1.getGeoPoint("geoPoint")
+                if (geoPoint != null) {
+                    val location = LatLng(geoPoint.latitude, geoPoint.longitude)
+                    val marker = Marker()
+                    marker.position = location
+                    marker.onClickListener = this
+                    marker.map = mNaverMap
+                    coordinateMap[location] = s1.getDocumentReference("reference")
+                }
+            }
+            val lastGeoPoint = coordinateData.last().getGeoPoint("geoPoint")
+            if (lastGeoPoint != null) mNaverMap.moveCamera(
+                CameraUpdate.scrollTo(
+                    LatLng(
+                        lastGeoPoint.latitude, lastGeoPoint.longitude
+                    )
+                ).animate(CameraAnimation.Fly)
+            )
+        }.addOnFailureListener { e ->
+            Log.w(TAG, "Error getting documents, $e")
+        }
     }
 
     override fun onClick(overlay: Overlay): Boolean {
