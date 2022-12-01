@@ -2,10 +2,13 @@ package com.competition.valetparking
 
 import android.app.ActionBar.LayoutParams
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.util.Log
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -14,14 +17,18 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
 import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.*
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.Overlay
 import com.naver.maps.map.overlay.Overlay.OnClickListener
+
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
@@ -34,11 +41,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
     }
 
     data class FloorData(
-        var parkingMap: HashMap<Int, ParkingData?>, var parkingSize: Int
+        var parkingMap: HashMap<Int, ParkingData?>, var parkingSize: Int, var imageData: ImageData
     )
 
     data class ParkingData(     //parkingMap의 value으로 사용하기 위해 데이터클래스 생성
         var specialType: SpecialType, var using: Boolean    //특수주차구역 구분, 주차 여부
+    )
+
+    data class ImageData(
+        var storageUrl: String, var floor: Int
     )
 
     private lateinit var mNaverMap: NaverMap
@@ -46,6 +57,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
     //Layout 변수
     private lateinit var generalArea: TableLayout
     private lateinit var specialArea: TableLayout
+    private lateinit var saturationBar: ProgressBar
+    private lateinit var imageView: ImageView
     private lateinit var floorSpinner: Spinner
 
     private val tableRowLength = 6  //최대 행 길이
@@ -59,6 +72,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
     //reference listener 중복 생성 방지를 위한 변수
     private var referenceListener: ListenerRegistration? = null
+
+    private lateinit var db: FirebaseFirestore
+    private lateinit var storageRef: StorageReference
 
     private val TAG = "MainActivity"
 
@@ -76,9 +92,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
         generalArea = findViewById(R.id.general_parking_layout)    //일반주차구역
         specialArea = findViewById(R.id.special_parking_layout)    //특수주차구역
-        floorSpinner = findViewById(R.id.floor_spinner)
+        saturationBar = findViewById(R.id.saturation_bar)           //포화도 막대
+        imageView = findViewById(R.id.image_view)                     //이미지뷰
+        floorSpinner = findViewById(R.id.floor_spinner)             //층 수 스피너
 
-        val db = Firebase.firestore
+        db = Firebase.firestore
+        storageRef = FirebaseStorage.getInstance().reference
+
         db.collection("Coordinates").get().addOnSuccessListener { coordinateData ->
             for (s1 in coordinateData) {
                 val geoPoint = s1.getGeoPoint("geoPoint")
@@ -99,8 +119,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
                     )
                 ).animate(CameraAnimation.Fly)
             )
-        }.addOnFailureListener { exception ->
-            Log.w(TAG, "Error getting documents, $exception")
+        }.addOnFailureListener { e ->
+            Log.w(TAG, "Error getting documents, $e")
         }
 
         floorSpinner.onItemSelectedListener = object : OnItemSelectedListener {
@@ -110,6 +130,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
                 if (prevMarker != recentMarker || prevFloor != selectFloor) {
                     prevFloor = selectFloor
                     drawParkingLayout(floorList[selectFloor])
+
+                    val imageData = floorList[selectFloor].imageData
+                    downloadImage(
+                        storageRef.child(imageData.storageUrl + "/" + imageData.floor + ".png"),
+                        imageView
+                    )
                 } else {
                     floorSpinner.setSelection(prevFloor!!)
                     drawParkingLayout(floorList[prevFloor!!])
@@ -126,11 +152,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         uiSettings.isZoomControlEnabled = false
     }
 
-    override fun onClick(p0: Overlay): Boolean {
-        if (p0 is Marker) {
-            mNaverMap.moveCamera(CameraUpdate.scrollTo(p0.position).animate(CameraAnimation.Easing))
+    override fun onClick(overlay: Overlay): Boolean {
+        if (overlay is Marker) {
+            mNaverMap.moveCamera(
+                CameraUpdate.scrollTo(overlay.position).animate(CameraAnimation.Easing)
+            )
 
-            val reference = coordinateMap[p0.position] ?: return false
+            val reference = coordinateMap[overlay.position] ?: return false
             referenceListener?.remove()
 
             referenceListener = reference.addSnapshotListener { snapshot, e ->
@@ -143,8 +171,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
                 floorList.clear()
                 val data = snapshot?.data
-                val p1 = data?.get("floorArray") as MutableList<*>
-                for (floor in p1) {
+                val p0 = data?.get("floorArray") as MutableList<*>
+                for (floor in p0) {
                     floor as HashMap<*, *>
                     val parkingSize = anyToInt(floor["parkingSize"])
                     val parkingMap = HashMap<Int, ParkingData?>()
@@ -154,11 +182,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
                             SpecialType.fromInt(anyToInt(values[0])), anyToBoolean(values[1])
                         ) else null
                     }
-                    floorList.add(FloorData(parkingMap, parkingSize))
+                    floorList.add(
+                        FloorData(
+                            parkingMap, parkingSize, ImageData(snapshot.id, p0.indexOf(floor))
+                        )
+                    )
                 }
                 if (floorSpinner.visibility == INVISIBLE) floorSpinner.visibility = VISIBLE
                 prevMarker = recentMarker
-                recentMarker = p0
+                recentMarker = overlay
 
                 if (floorSpinner.adapter == null || floorSpinner.adapter.count != floorList.size) {
                     val spinnerList = ArrayList<String>()
@@ -239,7 +271,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
             }
         }
 
-        val saturationBar: ProgressBar = findViewById(R.id.saturation_bar)  //포화도 막대
         val saturation: Int =
             (parkingMap.filterValues { it == null }.size * 100) / (parkingSize - specialList.size)
         //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
@@ -254,6 +285,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         saturationBar.progress = saturation
     }
 
+    private fun downloadImage(storageRef: StorageReference, imageView: ImageView) {
+        imageView.setImageResource(0)
+        val ONE_MEGABYTE: Long = 1024 * 2048
+        val height =
+            TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 240F, resources.displayMetrics)
+        val params = imageView.layoutParams
+        params.width = LayoutParams.MATCH_PARENT
+        storageRef.getBytes(ONE_MEGABYTE).addOnSuccessListener {
+            params.height = height.toInt()
+            imageView.layoutParams = params
+            imageView.setImageBitmap(byteArrayToBitmap(it))
+        }.addOnFailureListener { e ->
+            params.height = LayoutParams.WRAP_CONTENT
+            imageView.layoutParams = params
+            e.printStackTrace()
+        }
+    }
+
     private fun newLocText(): TextView {
         val locText = TextView(this)
         locText.layoutParams = TableRow.LayoutParams(100, 120)
@@ -262,6 +311,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         locText.setTextColor(Color.DKGRAY)
         locText.gravity = Gravity.CENTER
         return locText
+    }
+
+    private fun byteArrayToBitmap(byteArray: ByteArray): Bitmap? {
+        return BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
     }
 
     companion object {

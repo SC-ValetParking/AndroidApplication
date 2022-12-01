@@ -60,6 +60,12 @@
                 android:stretchColumns="*"
                 tools:ignore="UselessLeaf" />
 
+            <ImageView
+                android:id="@+id/image_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                tools:ignore="ContentDescription" />
+
             <Spinner
                 android:id="@+id/floor_spinner"
                 android:layout_width="match_parent"
