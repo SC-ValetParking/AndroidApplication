@@ -1,8 +1,8 @@
 package com.competition.valetparking
 
+import android.annotation.SuppressLint
 import android.app.ActionBar.LayoutParams
 import android.content.res.ColorStateList
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import android.widget.AdapterView.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentManager
@@ -28,6 +29,10 @@ import com.naver.maps.map.*
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.Overlay
 import com.naver.maps.map.overlay.Overlay.OnClickListener
+import io.reactivex.Observable
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+import kotlin.system.exitProcess
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
@@ -147,7 +152,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
                 ).animate(CameraAnimation.Fly)
             )
         }.addOnFailureListener { e ->
-            Log.w(TAG, "Error getting documents, $e")
+            AlertDialog.Builder(this).setTitle("데이터 수신 실패").setMessage(e.message).setPositiveButton(
+                "OK"
+            ) { _, _ ->
+                moveTaskToBack(true)
+                finishAndRemoveTask()
+                exitProcess(0)
+            }.create().show()
+            e.printStackTrace()
         }
     }
 
@@ -205,6 +217,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         return false
     }
 
+    @SuppressLint("CheckResult")
     private fun drawParkingLayout(floorData: FloorData) {
         generalArea.removeAllViews()
         specialArea.removeAllViews()
@@ -272,7 +285,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
 
         val saturation: Int =
             (parkingMap.filterValues { it == null }.size * 100) / (parkingSize - specialList.size)
-        //filterValues { it == null } ← 이건 parkingMap에서 value가 null인 항목만 찾겠다는 뜻이에요.
+
         val color: Int = when (saturation) {      //포화도 색상 선택
             in 1..25 -> R.color.green
             in 26..50 -> R.color.yellow
@@ -281,7 +294,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         }
         saturationBar.progressTintList =
             ColorStateList.valueOf(ContextCompat.getColor(this, color))    //포화도 색상 변경
-        saturationBar.progress = saturation
+
+        val currentProgress = saturationBar.progress
+        val value = saturation - currentProgress / 10
+        val isRaise = value > 0
+        getInterval(abs(value)).subscribe {
+            saturationBar.progress =
+                if (isRaise) currentProgress + it.toInt() else currentProgress - it.toInt()
+        }
     }
 
     private fun downloadImage(storageRef: StorageReference, imageView: ImageView) {
@@ -294,7 +314,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         storageRef.getBytes(ONE_MEGABYTE).addOnSuccessListener {
             params.height = height.toInt()
             imageView.layoutParams = params
-            imageView.setImageBitmap(byteArrayToBitmap(it))
+            imageView.setImageBitmap(BitmapFactory.decodeByteArray(it, 0, it.size))
         }.addOnFailureListener { e ->
             params.height = LayoutParams.WRAP_CONTENT
             imageView.layoutParams = params
@@ -312,8 +332,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, OnClickListener {
         return locText
     }
 
-    private fun byteArrayToBitmap(byteArray: ByteArray): Bitmap? {
-        return BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+    private fun getInterval(value: Int): Observable<Long> {
+        return Observable.interval(1L, TimeUnit.MILLISECONDS).map { interval ->
+            interval + 1
+        }.take(value.toLong() * 10)
     }
 
     companion object {

@@ -40,7 +40,7 @@
                     style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="match_parent"
                     android:layout_height="20dp"
-                    android:progress="37"
+                    android:max="1000"
                     android:progressDrawable="@drawable/saturation_bar" />
             </LinearLayout>
 
